@@ -9,6 +9,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No path' }, { status: 400 });
     }
 
+    // If it's a Supabase Storage URL, redirect directly to it
+    if (thumbPath.startsWith('http://') || thumbPath.startsWith('https://')) {
+      return NextResponse.redirect(thumbPath);
+    }
+
     // Security: only allow paths within our thumbs dir or assets dir
     const THUMBS_DIR = process.env.THUMBS_DIR ?? '';
     const ASSETS_ROOT = process.env.ASSETS_ROOT ?? '';

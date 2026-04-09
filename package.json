@@ -9,7 +9,8 @@
     "lint": "eslint",
     "ingest": "tsx src/scripts/ingest.ts",
     "watch": "tsx src/scripts/ingest.ts --watch",
-    "migrate-to-supabase": "tsx src/scripts/migrate-to-supabase.ts"
+    "migrate-to-supabase": "tsx src/scripts/migrate-to-supabase.ts",
+    "upload-thumbs": "tsx src/scripts/upload-thumbs-to-supabase.ts"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
