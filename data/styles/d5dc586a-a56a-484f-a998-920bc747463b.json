@@ -1,0 +1,32 @@
+{
+  "id": "d5dc586a-a56a-484f-a998-920bc747463b",
+  "name": "doze script",
+  "createdAt": "2026-04-06T09:33:49.134Z",
+  "sourceType": "file",
+  "sourceName": "doze script.mov",
+  "status": "ready",
+  "analysis": {
+    "hookStyle": "Direct comparison of a 'garbage' competitor product vs. the premium product, immediately establishing a problem-solution narrative with a clear visual contrast.",
+    "pacing": "Very fast, dynamic cuts (0.5-1.5s per shot) during the comparison segment, transitioning to a slightly slower but still brisk pace for product features and benefits, maintaining high energy throughout.",
+    "shotTypes": [
+      "Direct address to camera (talking head)",
+      "Close-up product shots",
+      "Side-by-side comparison shots",
+      "Action shots (frothing, pouring coffee)",
+      "Product unboxing/reveal"
+    ],
+    "textOverlayStyle": "Bold, white, sans-serif text overlays appearing centrally, often single words or short phrases, timed precisely with the speaker's narration to emphasize key points and features.",
+    "toneEnergy": "Energetic, persuasive, confident, and urgent, with a direct and informative delivery from the creator.",
+    "ctaStyle": "Strong, direct call to action emphasizing urgency and scarcity ('limited time deal', 'selling faster than we can keep them in stock', 'try it today before it's too late'), directing viewers to the link on the video.",
+    "musicStyle": "Upbeat, modern, slightly electronic/pop instrumental track with a medium-fast BPM, providing an energetic but non-distracting background.",
+    "keyInsights": [
+      "Utilizes a 'bad vs. good' comparison format to highlight product superiority.",
+      "Employs rapid-fire visual and textual cues to showcase features and benefits efficiently.",
+      "Creates urgency and FOMO (Fear Of Missing Out) with limited-time offer and stock warnings.",
+      "Integrates social proof (100,000+ 5-star reviews) to build trust and credibility.",
+      "Breaks down complex product benefits into easily digestible points."
+    ],
+    "recommendedFor": "Product launch announcements, direct response ads, limited-time offers, comparison videos, short-form social media content (TikTok, Reels, Shorts), and educational product explainers."
+  },
+  "styleSummary": "REFERENCE STYLE GUIDE — \"doze script\":\nHook: Direct comparison of a 'garbage' competitor product vs. the premium product, immediately establishing a problem-solution narrative with a clear visual contrast.\nPacing: Very fast, dynamic cuts (0.5-1.5s per shot) during the comparison segment, transitioning to a slightly slower but still brisk pace for product features and benefits, maintaining high energy throughout.\nShot types: Direct address to camera (talking head), Close-up product shots, Side-by-side comparison shots, Action shots (frothing, pouring coffee), Product unboxing/reveal\nText overlays: Bold, white, sans-serif text overlays appearing centrally, often single words or short phrases, timed precisely with the speaker's narration to emphasize key points and features.\nTone/Energy: Energetic, persuasive, confident, and urgent, with a direct and informative delivery from the creator.\nCTA: Strong, direct call to action emphasizing urgency and scarcity ('limited time deal', 'selling faster than we can keep them in stock', 'try it today before it's too late'), directing viewers to the link on the video.\nMusic: Upbeat, modern, slightly electronic/pop instrumental track with a medium-fast BPM, providing an energetic but non-distracting background.\nKey techniques: Utilizes a 'bad vs. good' comparison format to highlight product superiority.; Employs rapid-fire visual and textual cues to showcase features and benefits efficiently.; Creates urgency and FOMO (Fear Of Missing Out) with limited-time offer and stock warnings.; Integrates social proof (100,000+ 5-star reviews) to build trust and credibility.; Breaks down complex product benefits into easily digestible points.\n\nEmulate this style closely when selecting clips, writing script lines, and planning transitions."
+}
