@@ -112,11 +112,15 @@ These are the primary differentiators — use these in queries and the agent API
 
 ---
 
-## Thumbnail
+## Cloud Storage URLs
 
-| Column | Description |
-|--------|-------------|
-| `thumbPath` | **Supabase Storage public URL** — serves directly via CDN |
+| Column | Storage | Description |
+|--------|---------|-------------|
+| `thumbPath` | **Supabase Storage** | Public CDN URL for the preview thumbnail JPG |
+| `fileUrl` | **Cloudflare R2** | Public CDN URL for the original image file (images only, NULL for videos) |
+| `filePath` | Local disk | Absolute local path — used for ingest deduplication and video playback |
+
+> **Agent usage:** Prefer `fileUrl` for images, fall back to `filePath` for videos (local-only).
 
 ---
 
