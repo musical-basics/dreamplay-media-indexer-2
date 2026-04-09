@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     if (hasSubjectFilter) {
       // Fetch matching-subject assets first
       for (const subj of subjects!) {
-        const { assets } = queryAssets({
+        const { assets } = await queryAssets({
           subject: subj,
           dsModel: dsModel || undefined,
           campaign: campaign || undefined,
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     // Fall back to all assets if subject filter returned too few (< 6 clips)
     if (candidateAssets.length < 6) {
-      const { assets: allAssets } = queryAssets({
+      const { assets: allAssets } = await queryAssets({
         dsModel: dsModel || undefined,
         campaign: campaign || undefined,
         limit: 80,

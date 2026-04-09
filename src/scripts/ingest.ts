@@ -110,7 +110,7 @@ async function ingestFile(filePath: string, processed: { count: number }): Promi
   if (!mediaType) return;
 
   // Check if already ingested and unchanged
-  const existing = getAssetByPath(filePath);
+  const existing = await getAssetByPath(filePath);
   const stat = fs.statSync(filePath);
   if (existing && existing.fileSize === stat.size && existing.updatedAt > stat.mtimeMs) {
     return; // skip — unchanged
@@ -175,7 +175,7 @@ async function ingestFile(filePath: string, processed: { count: number }): Promi
     updatedAt: Date.now(),
   };
 
-  upsertAsset(record);
+  await upsertAsset(record);
   console.log(`   ✓ [${status}] [${priority}] ${tags.subject} — ${tags.aiDescription.slice(0, 80)}`);
 }
 

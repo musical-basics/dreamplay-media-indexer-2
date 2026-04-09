@@ -1,81 +1,26 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import { AssetRecord } from './taxonomy';
 
-let _db: Database.Database | null = null;
+// ── Supabase client (server-side, service-role only) ─────────────────────────
 
-export function getDb(): Database.Database {
-  if (_db) return _db;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
 
-  const dbPath = process.env.CATALOG_DB_PATH!;
-  const dbDir = path.dirname(dbPath);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSupabase(): any {
+  if (_supabase) return _supabase;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars');
   }
-
-  _db = new Database(dbPath);
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('synchronous = NORMAL');
-  initSchema(_db);
-  return _db;
+  // Cast options to any to allow custom schema without TS generics conflict
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _supabase = createClient(url, key, { db: { schema: 'asset_indexer' as any }, auth: { persistSession: false } });
+  return _supabase;
 }
 
-function initSchema(db: Database.Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS assets (
-      id TEXT PRIMARY KEY,
-      filePath TEXT UNIQUE NOT NULL,
-      fileName TEXT NOT NULL,
-      fileSize INTEGER,
-      mimeType TEXT,
-      mediaType TEXT,
-      width INTEGER,
-      height INTEGER,
-      durationSeconds REAL,
-      fps REAL,
-      codec TEXT,
-      orientation TEXT,
-      aspectRatio TEXT,
-      subject TEXT DEFAULT 'unknown',
-      handZone TEXT,
-      dsModel TEXT,
-      purpose TEXT DEFAULT 'unknown',
-      campaign TEXT DEFAULT 'Other',
-      shotType TEXT DEFAULT 'unknown',
-      finalStatus TEXT DEFAULT 'raw',
-      colorLabel TEXT,
-      priority TEXT DEFAULT 'normal',
-      mood TEXT DEFAULT '',
-      colorGrade TEXT DEFAULT '',
-      aiDescription TEXT DEFAULT '',
-      aiKeywords TEXT DEFAULT '[]',
-      thumbPath TEXT,
-      ingestedAt INTEGER,
-      updatedAt INTEGER
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_finalStatus ON assets(finalStatus);
-    CREATE INDEX IF NOT EXISTS idx_subject ON assets(subject);
-    CREATE INDEX IF NOT EXISTS idx_purpose ON assets(purpose);
-    CREATE INDEX IF NOT EXISTS idx_handZone ON assets(handZone);
-    CREATE INDEX IF NOT EXISTS idx_dsModel ON assets(dsModel);
-    CREATE INDEX IF NOT EXISTS idx_campaign ON assets(campaign);
-    CREATE INDEX IF NOT EXISTS idx_priority ON assets(priority);
-    CREATE INDEX IF NOT EXISTS idx_colorLabel ON assets(colorLabel);
-    CREATE INDEX IF NOT EXISTS idx_mediaType ON assets(mediaType);
-
-    CREATE TABLE IF NOT EXISTS drafts (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      createdAt INTEGER,
-      updatedAt INTEGER,
-      data TEXT
-    );
-  `);
-}
-
-// ── Draft helpers ─────────────────────────────────────────────────────────
+// ── Draft types ───────────────────────────────────────────────────────────────
 
 export interface DraftRecord {
   id: string;
@@ -85,81 +30,73 @@ export interface DraftRecord {
   data: string; // JSON blob
 }
 
-export function saveDraft(id: string, name: string, data: object): DraftRecord {
-  const db = getDb();
+// ── Draft helpers ─────────────────────────────────────────────────────────────
+
+export async function saveDraft(id: string, name: string, data: object): Promise<DraftRecord> {
+  const supabase = getSupabase();
   const now = Date.now();
-  db.prepare(`
-    INSERT INTO drafts (id, name, createdAt, updatedAt, data)
-    VALUES (@id, @name, @createdAt, @updatedAt, @data)
-    ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name,
-      updatedAt = excluded.updatedAt,
-      data = excluded.data
-  `).run({ id, name, createdAt: now, updatedAt: now, data: JSON.stringify(data) });
-  return db.prepare('SELECT * FROM drafts WHERE id = ?').get(id) as DraftRecord;
+  const row = { id, name, createdAt: now, updatedAt: now, data: JSON.stringify(data) };
+
+  const { data: saved, error } = await supabase
+    .from('drafts')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .upsert(row as any, { onConflict: 'id' })
+    .select()
+    .single();
+
+  if (error) throw new Error(`saveDraft failed: ${error.message}`);
+  return saved as DraftRecord;
 }
 
-export function listDrafts(): DraftRecord[] {
-  return getDb().prepare('SELECT * FROM drafts ORDER BY updatedAt DESC').all() as DraftRecord[];
+export async function listDrafts(): Promise<DraftRecord[]> {
+  const { data, error } = await getSupabase()
+    .from('drafts')
+    .select('*')
+    .order('updatedAt', { ascending: false });
+
+  if (error) throw new Error(`listDrafts failed: ${error.message}`);
+  return (data ?? []) as DraftRecord[];
 }
 
-export function getDraft(id: string): DraftRecord | undefined {
-  return getDb().prepare('SELECT * FROM drafts WHERE id = ?').get(id) as DraftRecord | undefined;
+export async function getDraft(id: string): Promise<DraftRecord | undefined> {
+  const { data, error } = await getSupabase()
+    .from('drafts')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw new Error(`getDraft failed: ${error.message}`);
+  return (data ?? undefined) as DraftRecord | undefined;
 }
 
-export function deleteDraft(id: string): void {
-  getDb().prepare('DELETE FROM drafts WHERE id = ?').run(id);
+export async function deleteDraft(id: string): Promise<void> {
+  const { error } = await getSupabase().from('drafts').delete().eq('id', id);
+  if (error) throw new Error(`deleteDraft failed: ${error.message}`);
 }
 
-export function upsertAsset(asset: AssetRecord) {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO assets (
-      id, filePath, fileName, fileSize, mimeType, mediaType,
-      width, height, durationSeconds, fps, codec, orientation, aspectRatio,
-      subject, handZone, dsModel, purpose, campaign, shotType,
-      finalStatus, colorLabel, priority, mood, colorGrade,
-      aiDescription, aiKeywords, thumbPath, ingestedAt, updatedAt
-    ) VALUES (
-      @id, @filePath, @fileName, @fileSize, @mimeType, @mediaType,
-      @width, @height, @durationSeconds, @fps, @codec, @orientation, @aspectRatio,
-      @subject, @handZone, @dsModel, @purpose, @campaign, @shotType,
-      @finalStatus, @colorLabel, @priority, @mood, @colorGrade,
-      @aiDescription, @aiKeywords, @thumbPath, @ingestedAt, @updatedAt
-    )
-    ON CONFLICT(filePath) DO UPDATE SET
-      fileSize = excluded.fileSize,
-      mimeType = excluded.mimeType,
-      width = excluded.width,
-      height = excluded.height,
-      durationSeconds = excluded.durationSeconds,
-      fps = excluded.fps,
-      codec = excluded.codec,
-      orientation = excluded.orientation,
-      aspectRatio = excluded.aspectRatio,
-      subject = excluded.subject,
-      handZone = excluded.handZone,
-      dsModel = excluded.dsModel,
-      purpose = excluded.purpose,
-      campaign = excluded.campaign,
-      shotType = excluded.shotType,
-      finalStatus = excluded.finalStatus,
-      colorLabel = excluded.colorLabel,
-      priority = excluded.priority,
-      mood = excluded.mood,
-      colorGrade = excluded.colorGrade,
-      aiDescription = excluded.aiDescription,
-      aiKeywords = excluded.aiKeywords,
-      thumbPath = excluded.thumbPath,
-      updatedAt = excluded.updatedAt
-  `);
-  stmt.run(asset);
+// ── Asset helpers ─────────────────────────────────────────────────────────────
+
+export async function upsertAsset(asset: AssetRecord): Promise<void> {
+  const { error } = await getSupabase()
+    .from('assets')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .upsert(asset as any, { onConflict: 'filePath' });
+
+  if (error) throw new Error(`upsertAsset failed: ${error.message}`);
 }
 
-export function getAssetByPath(filePath: string): AssetRecord | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM assets WHERE filePath = ?').get(filePath) as AssetRecord | undefined;
+export async function getAssetByPath(filePath: string): Promise<AssetRecord | undefined> {
+  const { data, error } = await getSupabase()
+    .from('assets')
+    .select('*')
+    .eq('filePath', filePath)
+    .maybeSingle();
+
+  if (error) throw new Error(`getAssetByPath failed: ${error.message}`);
+  return (data ?? undefined) as AssetRecord | undefined;
 }
+
+// ── Query helpers ─────────────────────────────────────────────────────────────
 
 export interface QueryFilters {
   finalStatus?: string;
@@ -180,53 +117,93 @@ export interface QueryFilters {
   offset?: number;
 }
 
-export function queryAssets(filters: QueryFilters): { assets: AssetRecord[]; total: number } {
-  const db = getDb();
-  const conditions: string[] = [];
-  const params: (string | number)[] = [];
-
-  if (filters.finalStatus) { conditions.push('finalStatus = ?'); params.push(filters.finalStatus); }
-  if (filters.subject) { conditions.push('subject = ?'); params.push(filters.subject); }
-  if (filters.handZone) { conditions.push('handZone = ?'); params.push(filters.handZone); }
-  if (filters.dsModel) { conditions.push('dsModel = ?'); params.push(filters.dsModel); }
-  if (filters.purpose) { conditions.push('purpose = ?'); params.push(filters.purpose); }
-  if (filters.campaign) { conditions.push('campaign = ?'); params.push(filters.campaign); }
-  if (filters.shotType) { conditions.push('shotType = ?'); params.push(filters.shotType); }
-  if (filters.colorLabel) { conditions.push('colorLabel = ?'); params.push(filters.colorLabel); }
-  if (filters.priority) { conditions.push('priority = ?'); params.push(filters.priority); }
-  if (filters.mediaType) { conditions.push('mediaType = ?'); params.push(filters.mediaType); }
-  if (filters.orientation) { conditions.push('orientation = ?'); params.push(filters.orientation); }
-  if (filters.minDuration != null) { conditions.push('durationSeconds >= ?'); params.push(filters.minDuration); }
-  if (filters.maxDuration != null) { conditions.push('durationSeconds <= ?'); params.push(filters.maxDuration); }
-  if (filters.search) {
-    conditions.push('(aiDescription LIKE ? OR aiKeywords LIKE ? OR fileName LIKE ?)');
-    const q = `%${filters.search}%`;
-    params.push(q, q, q);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const total = (db.prepare(`SELECT COUNT(*) as count FROM assets ${where}`).get(...params) as { count: number }).count;
-
+export async function queryAssets(
+  filters: QueryFilters,
+): Promise<{ assets: AssetRecord[]; total: number }> {
+  const supabase = getSupabase();
   const limit = filters.limit ?? 200;
   const offset = filters.offset ?? 0;
-  const assets = db
-    .prepare(`SELECT * FROM assets ${where} ORDER BY priority DESC, finalStatus ASC, updatedAt DESC LIMIT ? OFFSET ?`)
-    .all(...params, limit, offset) as AssetRecord[];
 
-  return { assets, total };
+  // ── Data query ──────────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let dataQ: any = supabase
+    .from('assets')
+    .select('*')
+    .order('priority', { ascending: false })
+    .order('finalStatus', { ascending: true })
+    .order('updatedAt', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  // ── Count query ─────────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let countQ: any = supabase
+    .from('assets')
+    .select('*', { count: 'exact', head: true });
+
+  // Apply filters to both queries identically
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function applyFilters(q: any): any {
+    if (filters.finalStatus) q = q.eq('finalStatus', filters.finalStatus);
+    if (filters.subject)     q = q.eq('subject', filters.subject);
+    if (filters.handZone)    q = q.eq('handZone', filters.handZone);
+    if (filters.dsModel)     q = q.eq('dsModel', filters.dsModel);
+    if (filters.purpose)     q = q.eq('purpose', filters.purpose);
+    if (filters.campaign)    q = q.eq('campaign', filters.campaign);
+    if (filters.shotType)    q = q.eq('shotType', filters.shotType);
+    if (filters.colorLabel)  q = q.eq('colorLabel', filters.colorLabel);
+    if (filters.priority)    q = q.eq('priority', filters.priority);
+    if (filters.mediaType)   q = q.eq('mediaType', filters.mediaType);
+    if (filters.orientation) q = q.eq('orientation', filters.orientation);
+    if (filters.minDuration != null) q = q.gte('durationSeconds', filters.minDuration);
+    if (filters.maxDuration != null) q = q.lte('durationSeconds', filters.maxDuration);
+    if (filters.search) {
+      const term = `%${filters.search}%`;
+      q = q.or(`aiDescription.ilike.${term},aiKeywords.ilike.${term},fileName.ilike.${term}`);
+    }
+    return q;
+  }
+
+  dataQ  = applyFilters(dataQ);
+  countQ = applyFilters(countQ);
+
+  const [{ data, error: dataErr }, { count, error: countErr }] = await Promise.all([
+    dataQ,
+    countQ,
+  ]);
+
+  if (dataErr)  throw new Error(`queryAssets (data) failed: ${dataErr.message}`);
+  if (countErr) throw new Error(`queryAssets (count) failed: ${countErr.message}`);
+
+  return { assets: (data ?? []) as AssetRecord[], total: count ?? 0 };
 }
 
-export function getAllAssetsByIds(ids: string[]): AssetRecord[] {
+export async function getAllAssetsByIds(ids: string[]): Promise<AssetRecord[]> {
   if (!ids.length) return [];
-  const db = getDb();
-  const placeholders = ids.map(() => '?').join(',');
-  return db.prepare(`SELECT * FROM assets WHERE id IN (${placeholders})`).all(...ids) as AssetRecord[];
+  const { data, error } = await getSupabase()
+    .from('assets')
+    .select('*')
+    .in('id', ids);
+
+  if (error) throw new Error(`getAllAssetsByIds failed: ${error.message}`);
+  return (data ?? []) as AssetRecord[];
 }
 
-export function getStats() {
-  const db = getDb();
-  const total = (db.prepare('SELECT COUNT(*) as count FROM assets').get() as { count: number }).count;
-  const finals = (db.prepare("SELECT COUNT(*) as count FROM assets WHERE finalStatus = 'final'").get() as { count: number }).count;
-  const highPriority = (db.prepare("SELECT COUNT(*) as count FROM assets WHERE priority = 'high'").get() as { count: number }).count;
-  return { total, finals, highPriority };
+export async function getStats(): Promise<{ total: number; finals: number; highPriority: number }> {
+  const supabase = getSupabase();
+
+  const [
+    { count: total, error: e1 },
+    { count: finals, error: e2 },
+    { count: highPriority, error: e3 },
+  ] = await Promise.all([
+    supabase.from('assets').select('*', { count: 'exact', head: true }),
+    supabase.from('assets').select('*', { count: 'exact', head: true }).eq('finalStatus', 'final'),
+    supabase.from('assets').select('*', { count: 'exact', head: true }).eq('priority', 'high'),
+  ]);
+
+  if (e1) throw new Error(`getStats (total) failed: ${e1.message}`);
+  if (e2) throw new Error(`getStats (finals) failed: ${e2.message}`);
+  if (e3) throw new Error(`getStats (highPriority) failed: ${e3.message}`);
+
+  return { total: total ?? 0, finals: finals ?? 0, highPriority: highPriority ?? 0 };
 }

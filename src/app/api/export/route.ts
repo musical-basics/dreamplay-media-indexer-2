@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No asset IDs provided' }, { status: 400 });
     }
 
-    const assets = getAllAssetsByIds(ids);
+    const assets = await getAllAssetsByIds(ids);
 
     let content: string;
     let filename: string;

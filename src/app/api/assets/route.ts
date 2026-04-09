@@ -24,8 +24,7 @@ export async function GET(req: NextRequest) {
       offset: sp.get('offset') ? parseInt(sp.get('offset')!) : 0,
     };
 
-    const result = queryAssets(filters);
-    const stats = getStats();
+    const [result, stats] = await Promise.all([queryAssets(filters), getStats()]);
 
     return NextResponse.json({ ...result, stats });
   } catch (err) {
