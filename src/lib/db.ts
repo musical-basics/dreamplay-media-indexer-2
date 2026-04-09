@@ -9,16 +9,19 @@ let _supabase: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getSupabase(): any {
   if (_supabase) return _supabase;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars');
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_KEY env vars');
   }
-  // Cast options to any to allow custom schema without TS generics conflict
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _supabase = createClient(url, key, { db: { schema: 'asset_indexer' as any }, auth: { persistSession: false } });
   return _supabase;
 }
+
+// Table name constants
+const ASSETS_TABLE = 'assets';
+const DRAFTS_TABLE = 'drafts';
 
 // ── Draft types ───────────────────────────────────────────────────────────────
 
@@ -38,7 +41,7 @@ export async function saveDraft(id: string, name: string, data: object): Promise
   const row = { id, name, createdAt: now, updatedAt: now, data: JSON.stringify(data) };
 
   const { data: saved, error } = await supabase
-    .from('drafts')
+    .from(DRAFTS_TABLE)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .upsert(row as any, { onConflict: 'id' })
     .select()
@@ -50,7 +53,7 @@ export async function saveDraft(id: string, name: string, data: object): Promise
 
 export async function listDrafts(): Promise<DraftRecord[]> {
   const { data, error } = await getSupabase()
-    .from('drafts')
+    .from(DRAFTS_TABLE)
     .select('*')
     .order('updatedAt', { ascending: false });
 
@@ -60,7 +63,7 @@ export async function listDrafts(): Promise<DraftRecord[]> {
 
 export async function getDraft(id: string): Promise<DraftRecord | undefined> {
   const { data, error } = await getSupabase()
-    .from('drafts')
+    .from(DRAFTS_TABLE)
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -70,7 +73,7 @@ export async function getDraft(id: string): Promise<DraftRecord | undefined> {
 }
 
 export async function deleteDraft(id: string): Promise<void> {
-  const { error } = await getSupabase().from('drafts').delete().eq('id', id);
+  const { error } = await getSupabase().from(DRAFTS_TABLE).delete().eq('id', id);
   if (error) throw new Error(`deleteDraft failed: ${error.message}`);
 }
 
@@ -78,7 +81,7 @@ export async function deleteDraft(id: string): Promise<void> {
 
 export async function upsertAsset(asset: AssetRecord): Promise<void> {
   const { error } = await getSupabase()
-    .from('assets')
+    .from(ASSETS_TABLE)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .upsert(asset as any, { onConflict: 'filePath' });
 
@@ -87,7 +90,7 @@ export async function upsertAsset(asset: AssetRecord): Promise<void> {
 
 export async function getAssetByPath(filePath: string): Promise<AssetRecord | undefined> {
   const { data, error } = await getSupabase()
-    .from('assets')
+    .from(ASSETS_TABLE)
     .select('*')
     .eq('filePath', filePath)
     .maybeSingle();
@@ -124,23 +127,20 @@ export async function queryAssets(
   const limit = filters.limit ?? 200;
   const offset = filters.offset ?? 0;
 
-  // ── Data query ──────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let dataQ: any = supabase
-    .from('assets')
+    .from(ASSETS_TABLE)
     .select('*')
     .order('priority', { ascending: false })
     .order('finalStatus', { ascending: true })
     .order('updatedAt', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  // ── Count query ─────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let countQ: any = supabase
-    .from('assets')
+    .from(ASSETS_TABLE)
     .select('*', { count: 'exact', head: true });
 
-  // Apply filters to both queries identically
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function applyFilters(q: any): any {
     if (filters.finalStatus) q = q.eq('finalStatus', filters.finalStatus);
@@ -180,7 +180,7 @@ export async function queryAssets(
 export async function getAllAssetsByIds(ids: string[]): Promise<AssetRecord[]> {
   if (!ids.length) return [];
   const { data, error } = await getSupabase()
-    .from('assets')
+    .from(ASSETS_TABLE)
     .select('*')
     .in('id', ids);
 
@@ -196,9 +196,9 @@ export async function getStats(): Promise<{ total: number; finals: number; highP
     { count: finals, error: e2 },
     { count: highPriority, error: e3 },
   ] = await Promise.all([
-    supabase.from('assets').select('*', { count: 'exact', head: true }),
-    supabase.from('assets').select('*', { count: 'exact', head: true }).eq('finalStatus', 'final'),
-    supabase.from('assets').select('*', { count: 'exact', head: true }).eq('priority', 'high'),
+    supabase.from(ASSETS_TABLE).select('*', { count: 'exact', head: true }),
+    supabase.from(ASSETS_TABLE).select('*', { count: 'exact', head: true }).eq('finalStatus', 'final'),
+    supabase.from(ASSETS_TABLE).select('*', { count: 'exact', head: true }).eq('priority', 'high'),
   ]);
 
   if (e1) throw new Error(`getStats (total) failed: ${e1.message}`);
