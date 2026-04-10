@@ -2241,24 +2241,28 @@ export default function MediaIndexer() {
 
       {detail && (
         <div className="drawer-backdrop" onClick={() => setDetail(null)}>
+
+          {/* ── Left: large image view (fills remaining space) ── */}
+          <div className="drawer-image-panel" onClick={e => e.stopPropagation()}>
+            {(detail.fileUrl || detail.thumbPath)
+              ? <img
+                  src={detail.fileUrl ?? thumbUrl(detail)!}
+                  alt={detail.fileName}
+                  className="drawer-image-large"
+                />
+              : <div className="drawer-image-placeholder">{detail.mediaType === 'video' ? '🎬' : '🖼'}</div>
+            }
+            {detail.finalStatus === 'final' && <div className="preview-final-badge">FINAL</div>}
+            {detail.mediaType === 'video' && detail.durationSeconds && (
+              <div className="preview-duration">{formatDuration(detail.durationSeconds)}</div>
+            )}
+            <button className="drawer-close" onClick={() => setDetail(null)} title="Close (Esc)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          {/* ── Right: metadata drawer ── */}
           <div className="detail-drawer" onClick={e => e.stopPropagation()}>
-
-            {/* ── Large image preview at top ── */}
-            <div className="drawer-image-wrap">
-              {detail.thumbPath
-                ? <img src={thumbUrl(detail)} alt={detail.fileName} className="drawer-image" />
-                : <div className="drawer-image-placeholder">{detail.mediaType === 'video' ? '🎬' : '🖼'}</div>
-              }
-              {detail.finalStatus === 'final' && <div className="preview-final-badge">FINAL</div>}
-              {detail.mediaType === 'video' && detail.durationSeconds && (
-                <div className="preview-duration">{formatDuration(detail.durationSeconds)}</div>
-              )}
-              <button className="drawer-close" onClick={() => setDetail(null)} title="Close">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-
-            {/* ── Scrollable details ── */}
             <div className="drawer-body">
               <div className="drawer-filename">{detail.fileName}</div>
               <div className="preview-desc">{detail.aiDescription || '—'}</div>
@@ -2322,6 +2326,7 @@ export default function MediaIndexer() {
               </div>
             </div>
           </div>
+
         </div>
       )}
 
