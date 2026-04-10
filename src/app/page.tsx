@@ -1963,7 +1963,7 @@ export default function MediaIndexer() {
     } else if (e.metaKey || e.ctrlKey) {
       setSelected(prev => { const next = new Set(prev); if (next.has(asset.id)) next.delete(asset.id); else next.add(asset.id); return next; });
     } else {
-      setSelected(prev => { const next = new Set(prev); if (next.has(asset.id)) next.delete(asset.id); else { next.clear(); next.add(asset.id); } return next; });
+      setSelected(prev => { const next = new Set(prev); if (next.has(asset.id)) next.delete(asset.id); else next.add(asset.id); return next; });
     }
   }
 
