@@ -289,6 +289,22 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .asset-card.starred { border-color: rgba(250,204,21,0.35); }
 .chip.starred-chip.active { background: rgba(250,204,21,0.12); border-color: #facc15; color: #facc15; }
 
+/* ── Card Action Buttons (download / delete) ── */
+.card-action-btn {
+  position: absolute; bottom: 5px;
+  background: rgba(0,0,0,0.6); border: none;
+  font-size: 11px; line-height: 1;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s, background 0.15s;
+  padding: 0; z-index: 3;
+}
+.asset-card:hover .card-action-btn { opacity: 1; }
+.download-btn { left: 5px; color: #60a5fa; }
+.download-btn:hover { background: rgba(96,165,250,0.25) !important; }
+.delete-btn { left: 31px; color: #f87171; }
+.delete-btn:hover { background: rgba(248,113,113,0.25) !important; }
+
 .asset-info { padding: 7px 8px; }
 .asset-name {
   font-size: 10px; font-weight: 500; color: var(--text); white-space: nowrap;

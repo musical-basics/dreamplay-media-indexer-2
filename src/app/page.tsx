@@ -24,6 +24,7 @@ interface Asset {
   width: number | null; height: number | null; codec: string | null;
   fps: number | null; updatedAt: number;
   starred: boolean; starredFor: string;
+  fileUrl: string | null;
 }
 interface Stats { total: number; finals: number; highPriority: number; }
 interface DraftMeta { id: string; name: string; createdAt: number; updatedAt: number; }
@@ -1973,7 +1974,6 @@ export default function MediaIndexer() {
   async function toggleStar(e: React.MouseEvent, asset: Asset) {
     e.stopPropagation();
     const newStarred = !asset.starred;
-    // Optimistic update
     setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, starred: newStarred } : a));
     try {
       await fetch(`/api/assets/${asset.id}/star`, {
@@ -1982,8 +1982,35 @@ export default function MediaIndexer() {
         body: JSON.stringify({ starred: newStarred }),
       });
     } catch {
-      // Revert on error
       setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, starred: asset.starred } : a));
+    }
+  }
+
+  function downloadAsset(e: React.MouseEvent, asset: Asset) {
+    e.stopPropagation();
+    if (!asset.fileUrl) { alert('No cloud URL for this asset — videos are local only.'); return; }
+    const a = document.createElement('a');
+    a.href = `/api/assets/${asset.id}/download`;
+    a.download = asset.fileName;
+    a.click();
+  }
+
+  async function deleteAsset(e: React.MouseEvent, asset: Asset) {
+    e.stopPropagation();
+    if (!confirm(`Delete "${asset.fileName}" from Cloudflare R2 and Supabase? This cannot be undone.`)) return;
+    // Optimistic removal
+    setAssets(prev => prev.filter(a => a.id !== asset.id));
+    setTotal(prev => prev - 1);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(`Delete failed: ${data.error}`);
+        fetchAssets(); // revert
+      }
+    } catch {
+      alert('Delete failed — network error');
+      fetchAssets();
     }
   }
 
@@ -2136,6 +2163,7 @@ export default function MediaIndexer() {
                     {asset.finalStatus === 'final' && <div className="final-badge">FINAL</div>}
                     {asset.priority === 'high' && <div className="priority-dot" style={{ background: asset.colorLabel ? COLOR_CHIPS[asset.colorLabel]?.bg : '#ef4444' }} />}
                     {isSelected && <div className="selected-checkmark">✓</div>}
+                    {/* Action overlay buttons */}
                     <button
                       className={`star-btn ${asset.starred ? 'starred' : ''}`}
                       onClick={(e) => toggleStar(e, asset)}
@@ -2143,6 +2171,18 @@ export default function MediaIndexer() {
                     >
                       {asset.starred ? '★' : '☆'}
                     </button>
+                    {asset.fileUrl && (
+                      <button
+                        className="card-action-btn download-btn"
+                        onClick={(e) => downloadAsset(e, asset)}
+                        title="Download to desktop"
+                      >⬇</button>
+                    )}
+                    <button
+                      className="card-action-btn delete-btn"
+                      onClick={(e) => deleteAsset(e, asset)}
+                      title="Delete from R2 + Supabase"
+                    >🗑</button>
                   </div>
                   <div className="asset-info">
                     <div className="asset-name" title={asset.fileName}>{asset.fileName}</div>
