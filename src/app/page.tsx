@@ -1841,6 +1841,9 @@ export default function MediaIndexer() {
   const lastClickedRef = useRef<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'images' | 'starred' | 'videos'>('images');
+  const [editAsset, setEditAsset] = useState<Asset | null>(null);
+  const [editFields, setEditFields] = useState<Record<string, string>>({});
+  const [editSaving, setEditSaving] = useState(false);
 
   // Exit select mode and clear when user presses Escape
   function exitSelectMode() { setSelectMode(false); setSelected(new Set()); }
@@ -2026,6 +2029,51 @@ export default function MediaIndexer() {
       alert('Delete failed — network error');
       fetchAssets();
     }
+  }
+
+  function openEdit(e: React.MouseEvent, asset: Asset) {
+    e.stopPropagation();
+    setEditAsset(asset);
+    const kw = (() => { try { return (JSON.parse(asset.aiKeywords) as string[]).join(', '); } catch { return ''; } })();
+    setEditFields({
+      finalStatus: asset.finalStatus ?? '',
+      priority: asset.priority ?? '',
+      subject: asset.subject ?? '',
+      handZone: asset.handZone ?? '',
+      dsModel: asset.dsModel ?? '',
+      shotType: asset.shotType ?? '',
+      purpose: asset.purpose ?? '',
+      campaign: asset.campaign ?? '',
+      colorLabel: asset.colorLabel ?? '',
+      orientation: asset.orientation ?? '',
+      aiDescription: asset.aiDescription ?? '',
+      aiKeywords: kw,
+      mood: asset.mood ?? '',
+      colorGrade: asset.colorGrade ?? '',
+    });
+  }
+
+  async function saveAssetEdits() {
+    if (!editAsset) return;
+    setEditSaving(true);
+    const body: Record<string, unknown> = { ...editFields };
+    // Convert keywords back to JSON array
+    body.aiKeywords = JSON.stringify(editFields.aiKeywords.split(',').map(s => s.trim()).filter(Boolean));
+    try {
+      const res = await fetch(`/api/assets/${editAsset.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setAssets(prev => prev.map(a => a.id === editAsset.id ? { ...a, ...editFields, aiKeywords: body.aiKeywords as string } : a));
+        setEditAsset(null);
+      } else {
+        const d = await res.json();
+        alert(`Save failed: ${d.error}`);
+      }
+    } catch { alert('Save failed — network error'); }
+    setEditSaving(false);
   }
 
   const selectedAssets = assets.filter(a => selected.has(a.id));
@@ -2218,6 +2266,11 @@ export default function MediaIndexer() {
                       onClick={(e) => deleteAsset(e, asset)}
                       title="Delete from R2 + Supabase"
                     >🗑</button>
+                    <button
+                      className="card-action-btn edit-btn"
+                      onClick={(e) => openEdit(e, asset)}
+                      title="Edit tags"
+                    >✏️</button>
                   </div>
                   <div className="asset-info">
                     <div className="asset-name" title={asset.fileName}>{asset.fileName}</div>
@@ -2351,6 +2404,83 @@ export default function MediaIndexer() {
       )}
 
       {showStoryBuilder && <StoryBuilder onClose={() => setShowStoryBuilder(false)} />}
+
+      {/* ── Edit Tags Modal ── */}
+      {editAsset && (
+        <div className="modal-overlay" onClick={() => setEditAsset(null)}>
+          <div className="edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <div className="edit-modal-title">Edit Tags — <span>{editAsset.fileName}</span></div>
+              <button className="modal-close" onClick={() => setEditAsset(null)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="edit-modal-body">
+              <div className="edit-fields-grid">
+                {([
+                  ['finalStatus', 'Status', 'select', ['raw','intermediate','final']],
+                  ['priority',    'Priority', 'select', ['normal','high']],
+                  ['orientation', 'Orientation', 'select', ['landscape','portrait','square']],
+                  ['subject',     'Subject',  'text'],
+                  ['handZone',    'Hand Zone', 'text'],
+                  ['dsModel',     'DS Model',  'text'],
+                  ['shotType',    'Shot Type', 'text'],
+                  ['purpose',     'Purpose',   'text'],
+                  ['campaign',    'Campaign',  'text'],
+                  ['colorLabel',  'Color Label','text'],
+                  ['mood',        'Mood',       'text'],
+                  ['colorGrade',  'Color Grade','text'],
+                ] as [string, string, string, string[]?][]).map(([key, label, type, opts]) => (
+                  <div key={key} className="edit-field-row">
+                    <label className="edit-field-label">{label}</label>
+                    {type === 'select' ? (
+                      <select
+                        className="edit-field-input"
+                        value={editFields[key] ?? ''}
+                        onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
+                      >
+                        <option value="">—</option>
+                        {(opts ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className="edit-field-input"
+                        type="text"
+                        value={editFields[key] ?? ''}
+                        onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="edit-field-row" style={{ marginTop: 8 }}>
+                <label className="edit-field-label">Description</label>
+                <textarea
+                  className="edit-field-input edit-textarea"
+                  value={editFields.aiDescription ?? ''}
+                  onChange={e => setEditFields(f => ({ ...f, aiDescription: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+              <div className="edit-field-row" style={{ marginTop: 4 }}>
+                <label className="edit-field-label">Keywords <span style={{fontWeight:400, color:'var(--text3)'}}>comma-separated</span></label>
+                <input
+                  className="edit-field-input"
+                  type="text"
+                  value={editFields.aiKeywords ?? ''}
+                  onChange={e => setEditFields(f => ({ ...f, aiKeywords: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="edit-modal-footer">
+              <button className="btn-ghost" onClick={() => setEditAsset(null)}>Cancel</button>
+              <button className="preview-select-btn" onClick={saveAssetEdits} disabled={editSaving}>
+                {editSaving ? 'Saving…' : 'Save Tags'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showReelGenerator && <ReelGenerator onClose={() => setShowReelGenerator(false)} />}
     </div>
   );
