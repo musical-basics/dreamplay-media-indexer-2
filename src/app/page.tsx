@@ -2238,31 +2238,29 @@ export default function MediaIndexer() {
         </div>
       )}
 
-      {detail && (
-        <div className="modal-overlay" onClick={() => setDetail(null)}>
-          <div className="preview-panel" onClick={e => e.stopPropagation()}>
 
-            {/* Left — large thumbnail */}
-            <div className="preview-media">
+      {detail && (
+        <div className="drawer-backdrop" onClick={() => setDetail(null)}>
+          <div className="detail-drawer" onClick={e => e.stopPropagation()}>
+
+            {/* ── Large image preview at top ── */}
+            <div className="drawer-image-wrap">
               {detail.thumbPath
-                ? <img src={thumbUrl(detail)} alt={detail.fileName} className="preview-thumb" />
-                : <div className="preview-thumb-placeholder">{detail.mediaType === 'video' ? '🎬' : '🖼'}</div>
+                ? <img src={thumbUrl(detail)} alt={detail.fileName} className="drawer-image" />
+                : <div className="drawer-image-placeholder">{detail.mediaType === 'video' ? '🎬' : '🖼'}</div>
               }
+              {detail.finalStatus === 'final' && <div className="preview-final-badge">FINAL</div>}
               {detail.mediaType === 'video' && detail.durationSeconds && (
                 <div className="preview-duration">{formatDuration(detail.durationSeconds)}</div>
               )}
-              {detail.finalStatus === 'final' && <div className="preview-final-badge">FINAL</div>}
+              <button className="drawer-close" onClick={() => setDetail(null)} title="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
             </div>
 
-            {/* Right — info */}
-            <div className="preview-info">
-              <div className="preview-header">
-                <div className="preview-filename">{detail.fileName}</div>
-                <button className="modal-close" onClick={() => setDetail(null)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-
+            {/* ── Scrollable details ── */}
+            <div className="drawer-body">
+              <div className="drawer-filename">{detail.fileName}</div>
               <div className="preview-desc">{detail.aiDescription || '—'}</div>
 
               <div className="preview-meta-grid">
@@ -2289,12 +2287,12 @@ export default function MediaIndexer() {
                 ))}
               </div>
 
-              <div className="preview-keywords">
+              <div className="preview-keywords" style={{ marginTop: 10 }}>
                 {(() => { try { return JSON.parse(detail.aiKeywords) as string[]; } catch { return []; } })()
                   .map((k, i) => <span key={i} className="tag">{k}</span>)}
               </div>
 
-              <div className="preview-path-row">
+              <div className="preview-path-row" style={{ marginTop: 10 }}>
                 <span className="preview-path">{detail.filePath}</span>
                 <button className="preview-icon-btn" title="Copy path" onClick={() => { navigator.clipboard.writeText(detail.filePath); setCopyMsg('Copied!'); setTimeout(() => setCopyMsg(''), 1500); }}>
                   {copyMsg === 'Copied!'
@@ -2304,14 +2302,20 @@ export default function MediaIndexer() {
                 </button>
               </div>
 
-              <div className="preview-actions">
+              <div className="preview-actions" style={{ marginTop: 12 }}>
                 <button className="preview-reveal-btn" onClick={async () => {
                   await fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: detail.filePath }) });
                 }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                   Reveal in Finder
                 </button>
-                <button className="preview-select-btn" onClick={() => { setSelected(prev => { const n = new Set(prev); n.add(detail.id); return n; }); setDetail(null); }}>
+                {detail.fileUrl && (
+                  <button className="preview-reveal-btn" onClick={() => downloadAsset({ stopPropagation: () => {} } as React.MouseEvent, detail)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download
+                  </button>
+                )}
+                <button className="preview-select-btn" onClick={() => { setSelectMode(true); setSelected(prev => { const n = new Set(prev); n.add(detail.id); return n; }); setDetail(null); }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
                   Add to Selection
                 </button>
