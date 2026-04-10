@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
       maxDuration: sp.get('maxDuration') ? parseFloat(sp.get('maxDuration')!) : undefined,
       starred: sp.get('starred') === 'true' ? true : sp.get('starred') === 'false' ? false : undefined,
       starredFor: sp.get('starredFor') ?? undefined,
+      excludeDownvoted: sp.get('excludeDownvoted') === 'true' ? true : undefined,
       limit: sp.get('limit') ? parseInt(sp.get('limit')!) : 1000,
       offset: sp.get('offset') ? parseInt(sp.get('offset')!) : 0,
     };

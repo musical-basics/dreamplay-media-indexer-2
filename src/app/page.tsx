@@ -1840,7 +1840,7 @@ export default function MediaIndexer() {
   const isDraggingRef = useRef(false);
   const lastClickedRef = useRef<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'images' | 'starred' | 'videos'>('images');
+  const [activeTab, setActiveTab] = useState<'images' | 'starred' | 'videos' | 'downvoted'>('images');
   const [editAsset, setEditAsset] = useState<Asset | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
   const [editSaving, setEditSaving] = useState(false);
@@ -1898,9 +1898,10 @@ export default function MediaIndexer() {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
     // Tab overrides — always applied last
-    if (activeTab === 'images')  { params.set('mediaType', 'image'); params.delete('starred'); }
-    if (activeTab === 'starred') { params.set('mediaType', 'image'); params.set('starred', 'true'); }
-    if (activeTab === 'videos')  { params.set('mediaType', 'video'); params.delete('starred'); }
+    if (activeTab === 'images')    { params.set('mediaType', 'image'); params.delete('starred'); params.set('excludeDownvoted', 'true'); }
+    if (activeTab === 'starred')   { params.set('mediaType', 'image'); params.set('starred', 'true'); params.set('excludeDownvoted', 'true'); }
+    if (activeTab === 'videos')    { params.set('mediaType', 'video'); params.delete('starred'); params.set('excludeDownvoted', 'true'); }
+    if (activeTab === 'downvoted') { params.set('colorLabel', 'downvoted'); params.delete('starred'); params.delete('excludeDownvoted'); }
     try {
       const res = await fetch(`/api/assets?${params}`);
       const data = await res.json();
@@ -2029,6 +2030,21 @@ export default function MediaIndexer() {
       alert('Delete failed — network error');
       fetchAssets();
     }
+  }
+
+  async function downvoteAsset(e: React.MouseEvent, asset: Asset) {
+    e.stopPropagation();
+    // Optimistic: remove from current tab
+    setAssets(prev => prev.filter(a => a.id !== asset.id));
+    setTotal(prev => prev - 1);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colorLabel: 'downvoted' }),
+      });
+      if (!res.ok) { const d = await res.json(); alert(`Downvote failed: ${d.error}`); fetchAssets(); }
+    } catch { alert('Downvote failed — network error'); fetchAssets(); }
   }
 
   function openEdit(e: React.MouseEvent, asset: Asset) {
@@ -2194,13 +2210,13 @@ export default function MediaIndexer() {
 
           {/* ── Tab bar ── */}
           <div className="tab-bar">
-            {(['images', 'starred', 'videos'] as const).map(tab => (
+            {(['images', 'starred', 'videos', 'downvoted'] as const).map(tab => (
               <button
                 key={tab}
-                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                className={`tab-btn ${activeTab === tab ? 'active' : ''} ${tab === 'downvoted' ? 'tab-btn-danger' : ''}`}
                 onClick={() => setActiveTab(tab)}
               >
-                {tab === 'images' ? '🖼️ Images' : tab === 'starred' ? '⭐ Starred' : '🎬 Videos'}
+                {tab === 'images' ? '🖼️ Images' : tab === 'starred' ? '⭐ Starred' : tab === 'videos' ? '🎬 Videos' : '👎 Downvoted'}
               </button>
             ))}
           </div>
@@ -2266,6 +2282,11 @@ export default function MediaIndexer() {
                       onClick={(e) => deleteAsset(e, asset)}
                       title="Delete from R2 + Supabase"
                     >🗑</button>
+                    <button
+                      className="card-action-btn downvote-btn"
+                      onClick={(e) => downvoteAsset(e, asset)}
+                      title="Downvote — move to Downvoted tab"
+                    >👎</button>
                     <button
                       className="card-action-btn edit-btn"
                       onClick={(e) => openEdit(e, asset)}

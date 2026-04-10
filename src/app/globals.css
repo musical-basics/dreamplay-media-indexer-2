@@ -210,6 +210,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .tab-btn:hover { color: var(--text2); }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-btn-danger:hover { color: #f87171; }
+.tab-btn-danger.active { color: #f87171; border-bottom-color: #f87171; }
 
 /* ── Zoom Slider ── */
 .zoom-slider-wrap {
@@ -318,10 +320,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   padding: 0; z-index: 3;
 }
 .asset-card:hover .card-action-btn { opacity: 1; }
-.download-btn { left: 5px; color: #60a5fa; }
-.download-btn:hover { background: rgba(96,165,250,0.25) !important; }
-.delete-btn { left: 31px; color: #f87171; }
-.delete-btn:hover { background: rgba(248,113,113,0.25) !important; }
+.download-btn  { left: 5px;  color: #60a5fa; }
+.download-btn:hover  { background: rgba(96,165,250,0.25) !important; }
+.delete-btn    { left: 31px; color: #f87171; }
+.delete-btn:hover    { background: rgba(248,113,113,0.25) !important; }
+.downvote-btn  { left: 57px; color: #fb923c; }
+.downvote-btn:hover  { background: rgba(251,146,60,0.25) !important; }
+.edit-btn      { left: 83px; color: #a78bfa; }
+.edit-btn:hover      { background: rgba(167,139,250,0.25) !important; }
 
 .asset-info { padding: 7px 8px; }
 .asset-name {

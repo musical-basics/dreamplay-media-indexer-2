@@ -118,6 +118,7 @@ export interface QueryFilters {
   maxDuration?: number;
   starred?: boolean;
   starredFor?: string;
+  excludeDownvoted?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -158,6 +159,7 @@ export async function queryAssets(
     if (filters.orientation) q = q.eq('orientation', filters.orientation);
     if (filters.minDuration != null) q = q.gte('durationSeconds', filters.minDuration);
     if (filters.maxDuration != null) q = q.lte('durationSeconds', filters.maxDuration);
+    if (filters.excludeDownvoted) q = q.or('colorLabel.neq.downvoted,colorLabel.is.null');
     if (filters.starred === true)  q = q.eq('starred', true);
     if (filters.starred === false) q = q.eq('starred', false);
     if (filters.starredFor) q = q.ilike('starredFor', `%${filters.starredFor}%`);
