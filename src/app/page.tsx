@@ -1840,6 +1840,7 @@ export default function MediaIndexer() {
   const isDraggingRef = useRef(false);
   const lastClickedRef = useRef<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'images' | 'starred' | 'videos'>('images');
 
   // Exit select mode and clear when user presses Escape
   function exitSelectMode() { setSelectMode(false); setSelected(new Set()); }
@@ -1893,6 +1894,10 @@ export default function MediaIndexer() {
     setLoading(true);
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+    // Tab overrides — always applied last
+    if (activeTab === 'images')  { params.set('mediaType', 'image'); params.delete('starred'); }
+    if (activeTab === 'starred') { params.set('mediaType', 'image'); params.set('starred', 'true'); }
+    if (activeTab === 'videos')  { params.set('mediaType', 'video'); params.delete('starred'); }
     try {
       const res = await fetch(`/api/assets?${params}`);
       const data = await res.json();
@@ -1901,7 +1906,8 @@ export default function MediaIndexer() {
       setStats(data.stats ?? { total: 0, finals: 0, highPriority: 0 });
     } catch (e) { console.error(e); }
     setLoading(false);
-  }, [filters]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, activeTab]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -2137,6 +2143,20 @@ export default function MediaIndexer() {
         <div className="sidebar-resize-handle" onMouseDown={startSidebarDrag} title="Drag to resize" />
         <main className="main-content">
           <PromptBox />
+
+          {/* ── Tab bar ── */}
+          <div className="tab-bar">
+            {(['images', 'starred', 'videos'] as const).map(tab => (
+              <button
+                key={tab}
+                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab === 'images' ? '🖼️ Images' : tab === 'starred' ? '⭐ Starred' : '🎬 Videos'}
+              </button>
+            ))}
+          </div>
+
           <div className="grid-header">
             <div className="grid-info">
               {loading ? 'Loading…' : `${total.toLocaleString()} assets`}
