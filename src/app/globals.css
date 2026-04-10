@@ -273,6 +273,22 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   background: rgba(201,168,76,0.2); color: var(--gold); font-size: 28px; font-weight: 700;
 }
 
+/* ── Star Button ── */
+.star-btn {
+  position: absolute; top: 5px; right: 22px;
+  background: rgba(0,0,0,0.5); border: none;
+  color: rgba(255,255,255,0.4); font-size: 13px; line-height: 1;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, background 0.15s;
+  padding: 0; z-index: 3;
+}
+.asset-card:hover .star-btn { opacity: 1; }
+.star-btn.starred { opacity: 1; color: #facc15; background: rgba(0,0,0,0.6); }
+.star-btn:hover { color: #facc15 !important; background: rgba(0,0,0,0.7); }
+.asset-card.starred { border-color: rgba(250,204,21,0.35); }
+.chip.starred-chip.active { background: rgba(250,204,21,0.12); border-color: #facc15; color: #facc15; }
+
 .asset-info { padding: 7px 8px; }
 .asset-name {
   font-size: 10px; font-weight: 500; color: var(--text); white-space: nowrap;

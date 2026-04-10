@@ -23,6 +23,7 @@ interface Asset {
   orientation: string | null; aspectRatio: string | null;
   width: number | null; height: number | null; codec: string | null;
   fps: number | null; updatedAt: number;
+  starred: boolean; starredFor: string;
 }
 interface Stats { total: number; finals: number; highPriority: number; }
 interface DraftMeta { id: string; name: string; createdAt: number; updatedAt: number; }
@@ -1880,7 +1881,7 @@ export default function MediaIndexer() {
   const [filters, setFilters] = useState({
     search: '', finalStatus: '', priority: '', subject: '', handZone: '',
     dsModel: '', purpose: '', campaign: '', shotType: '', colorLabel: '',
-    mediaType: '', orientation: '',
+    mediaType: '', orientation: '', starred: '',
   });
 
   const fetchAssets = useCallback(async () => {
@@ -1969,6 +1970,23 @@ export default function MediaIndexer() {
     await fetch('/api/ingest', { method: 'POST' });
   }
 
+  async function toggleStar(e: React.MouseEvent, asset: Asset) {
+    e.stopPropagation();
+    const newStarred = !asset.starred;
+    // Optimistic update
+    setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, starred: newStarred } : a));
+    try {
+      await fetch(`/api/assets/${asset.id}/star`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ starred: newStarred }),
+      });
+    } catch {
+      // Revert on error
+      setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, starred: asset.starred } : a));
+    }
+  }
+
   const selectedAssets = assets.filter(a => selected.has(a.id));
   const totalSelectedDuration = selectedAssets.reduce((sum, a) => sum + (a.durationSeconds ?? 0), 0);
 
@@ -2021,6 +2039,7 @@ export default function MediaIndexer() {
           <div className="filter-section">
             <div className="filter-label">Quick Filters</div>
             <div className="chip-row">
+              <button className={`chip ${filters.starred === 'true' ? 'active starred-chip' : ''}`} onClick={() => setFilters(prev => ({ ...prev, starred: prev.starred === 'true' ? '' : 'true' }))}>⭐ Starred{assets.filter(a => a.starred).length > 0 && filters.starred !== 'true' ? ` (${assets.filter(a => a.starred).length})` : ''}</button>
               <button className={`chip ${filters.priority === 'high' ? 'active' : ''}`} onClick={() => setFilter('priority', 'high')}>⚡ Priority</button>
               <button className={`chip ${filters.finalStatus === 'final' ? 'active' : ''}`} onClick={() => setFilter('finalStatus', 'final')}>✅ Finals Only</button>
               <button className={`chip ${filters.mediaType === 'video' ? 'active' : ''}`} onClick={() => setFilter('mediaType', 'video')}>🎬 Video</button>
@@ -2077,7 +2096,7 @@ export default function MediaIndexer() {
             <div className="chip-row">{['landscape', 'portrait', 'square'].map(o => (<button key={o} className={`chip ${filters.orientation === o ? 'active' : ''}`} onClick={() => setFilter('orientation', o)}>{o}</button>))}</div>
           </div>
           {Object.values(filters).some(v => v) && (
-            <button className="reset-btn" onClick={() => setFilters({ search: '', finalStatus: '', priority: '', subject: '', handZone: '', dsModel: '', purpose: '', campaign: '', shotType: '', colorLabel: '', mediaType: '', orientation: '' })}>✕ Clear All Filters</button>
+            <button className="reset-btn" onClick={() => setFilters({ search: '', finalStatus: '', priority: '', subject: '', handZone: '', dsModel: '', purpose: '', campaign: '', shotType: '', colorLabel: '', mediaType: '', orientation: '', starred: '' })}>✕ Clear All Filters</button>
           )}
         </aside>
         <div className="sidebar-resize-handle" onMouseDown={startSidebarDrag} title="Drag to resize" />
@@ -2110,13 +2129,20 @@ export default function MediaIndexer() {
               const thumb = thumbUrl(asset);
               const keywords = (() => { try { return JSON.parse(asset.aiKeywords) as string[]; } catch { return []; } })();
               return (
-                <div key={asset.id} className={`asset-card ${isSelected ? 'selected' : ''} ${asset.priority === 'high' ? 'priority' : ''} ${asset.orientation === 'portrait' ? 'portrait' : ''}`} onClick={(e) => handleAssetClick(asset, e)} onDoubleClick={() => setDetail(asset)}>
+                <div key={asset.id} className={`asset-card ${isSelected ? 'selected' : ''} ${asset.priority === 'high' ? 'priority' : ''} ${asset.orientation === 'portrait' ? 'portrait' : ''} ${asset.starred ? 'starred' : ''}`} onClick={(e) => handleAssetClick(asset, e)} onDoubleClick={() => setDetail(asset)}>
                   <div className="asset-thumb-wrap" style={{ aspectRatio: asset.orientation === 'portrait' ? '9/16' : asset.orientation === 'square' ? '1/1' : '16/9' }}>
                     {thumb ? <img src={thumb} alt={asset.fileName} className="asset-thumb" loading="lazy" /> : <div className="asset-thumb-placeholder">{asset.mediaType === 'video' ? '🎬' : '🖼'}</div>}
                     {asset.mediaType === 'video' && (<div className="video-overlay"><span className="play-icon">▶</span>{asset.durationSeconds && <span className="duration-badge">{formatDuration(asset.durationSeconds)}</span>}</div>)}
                     {asset.finalStatus === 'final' && <div className="final-badge">FINAL</div>}
                     {asset.priority === 'high' && <div className="priority-dot" style={{ background: asset.colorLabel ? COLOR_CHIPS[asset.colorLabel]?.bg : '#ef4444' }} />}
                     {isSelected && <div className="selected-checkmark">✓</div>}
+                    <button
+                      className={`star-btn ${asset.starred ? 'starred' : ''}`}
+                      onClick={(e) => toggleStar(e, asset)}
+                      title={asset.starred ? 'Unstar' : 'Star this asset'}
+                    >
+                      {asset.starred ? '★' : '☆'}
+                    </button>
                   </div>
                   <div className="asset-info">
                     <div className="asset-name" title={asset.fileName}>{asset.fileName}</div>

@@ -74,6 +74,8 @@ export async function GET(req: NextRequest) {
     search:      p.get('search')      ?? undefined,
     minDuration: p.get('minDuration') ? Number(p.get('minDuration')) : undefined,
     maxDuration: p.get('maxDuration') ? Number(p.get('maxDuration')) : undefined,
+    starred:     p.get('starred') === 'true' ? true : p.get('starred') === 'false' ? false : undefined,
+    starredFor:  p.get('starredFor')  ?? undefined,
   };
 
   // Remove undefined values

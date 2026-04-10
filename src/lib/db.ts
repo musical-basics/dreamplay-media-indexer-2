@@ -116,6 +116,8 @@ export interface QueryFilters {
   search?: string;
   minDuration?: number;
   maxDuration?: number;
+  starred?: boolean;
+  starredFor?: string;
   limit?: number;
   offset?: number;
 }
@@ -156,6 +158,9 @@ export async function queryAssets(
     if (filters.orientation) q = q.eq('orientation', filters.orientation);
     if (filters.minDuration != null) q = q.gte('durationSeconds', filters.minDuration);
     if (filters.maxDuration != null) q = q.lte('durationSeconds', filters.maxDuration);
+    if (filters.starred === true)  q = q.eq('starred', true);
+    if (filters.starred === false) q = q.eq('starred', false);
+    if (filters.starredFor) q = q.ilike('starredFor', `%${filters.starredFor}%`);
     if (filters.search) {
       const term = `%${filters.search}%`;
       q = q.or(`aiDescription.ilike.${term},aiKeywords.ilike.${term},fileName.ilike.${term}`);
@@ -206,4 +211,55 @@ export async function getStats(): Promise<{ total: number; finals: number; highP
   if (e3) throw new Error(`getStats (highPriority) failed: ${e3.message}`);
 
   return { total: total ?? 0, finals: finals ?? 0, highPriority: highPriority ?? 0 };
+}
+
+// ── Star helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Star or unstar an asset, optionally scoped to a use-case tag.
+ * Returns false if asset not found.
+ */
+export async function updateAssetStar(
+  id: string,
+  starred: boolean,
+  tag?: string,
+): Promise<boolean> {
+  const supabase = getSupabase();
+
+  // Fetch current star state
+  const { data: asset, error: fetchErr } = await supabase
+    .from(ASSETS_TABLE)
+    .select('id, starred, starredFor')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (fetchErr) throw new Error(`updateAssetStar fetch failed: ${fetchErr.message}`);
+  if (!asset) return false; // not found
+
+  let tags: string[] = [];
+  try { tags = JSON.parse(asset.starredFor ?? '[]'); } catch { tags = []; }
+
+  let newStarred: boolean;
+  if (starred) {
+    // Star: add tag if provided
+    if (tag && !tags.includes(tag)) tags.push(tag);
+    newStarred = true;
+  } else if (tag) {
+    // Remove only this tag; keep starred if other tags remain
+    tags = tags.filter((t: string) => t !== tag);
+    newStarred = tags.length > 0;
+  } else {
+    // Unstar globally
+    tags = [];
+    newStarred = false;
+  }
+
+  const { error: updateErr } = await supabase
+    .from(ASSETS_TABLE)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update({ starred: newStarred, starredFor: JSON.stringify(tags) } as any)
+    .eq('id', id);
+
+  if (updateErr) throw new Error(`updateAssetStar update failed: ${updateErr.message}`);
+  return true;
 }
