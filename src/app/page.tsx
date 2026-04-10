@@ -1839,6 +1839,10 @@ export default function MediaIndexer() {
   const [sidebarW, setSidebarW] = useState(210);
   const isDraggingRef = useRef(false);
   const lastClickedRef = useRef<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+
+  // Exit select mode and clear when user presses Escape
+  function exitSelectMode() { setSelectMode(false); setSelected(new Set()); }
 
   // Draggable sidebar resizer
   function startSidebarDrag(e: React.MouseEvent) {
@@ -1933,6 +1937,13 @@ export default function MediaIndexer() {
   }
 
   function handleAssetClick(asset: Asset, e: React.MouseEvent) {
+    lastClickedRef.current = asset.id;
+    if (!selectMode) {
+      // Default: open full preview
+      setDetail(asset);
+      return;
+    }
+    // Select mode: existing multi-select logic
     if (e.shiftKey && lastClickedRef.current) {
       const ids = assets.map(a => a.id);
       const lastIdx = ids.indexOf(lastClickedRef.current);
@@ -1941,12 +1952,9 @@ export default function MediaIndexer() {
       setSelected(prev => { const next = new Set(prev); ids.slice(start, end + 1).forEach(id => next.add(id)); return next; });
     } else if (e.metaKey || e.ctrlKey) {
       setSelected(prev => { const next = new Set(prev); if (next.has(asset.id)) next.delete(asset.id); else next.add(asset.id); return next; });
-    } else if (e.altKey) {
-      setDetail(asset);
     } else {
       setSelected(prev => { const next = new Set(prev); if (next.has(asset.id)) next.delete(asset.id); else { next.clear(); next.add(asset.id); } return next; });
     }
-    lastClickedRef.current = asset.id;
   }
 
   async function handleExport(format: 'davinci' | 'fcpxml') {
@@ -2141,7 +2149,14 @@ export default function MediaIndexer() {
             <div className="grid-actions">
               <button className="story-builder-btn" onClick={() => setShowStoryBuilder(true)}>🎬 Build Story</button>
               <button className="reel-gen-btn" onClick={() => setShowReelGenerator(true)}>🎙 Reel Generator</button>
-              {selected.size > 0 && (
+              <button
+                className={`btn-ghost select-mode-btn ${selectMode ? 'active' : ''}`}
+                onClick={() => { setSelectMode(s => !s); if (selectMode) setSelected(new Set()); }}
+                title={selectMode ? 'Exit select mode' : 'Enable select mode for export / story builder'}
+              >
+                {selectMode ? '✔ Selecting' : '▢ Select'}
+              </button>
+              {selectMode && selected.size > 0 && (
                 <>
                   <button className="btn-ghost" onClick={() => setSelected(new Set())}>Deselect All</button>
                   <button className="btn-ghost" onClick={() => setSelected(new Set(assets.map(a => a.id)))}>Select All ({assets.length})</button>
@@ -2156,13 +2171,13 @@ export default function MediaIndexer() {
               const thumb = thumbUrl(asset);
               const keywords = (() => { try { return JSON.parse(asset.aiKeywords) as string[]; } catch { return []; } })();
               return (
-                <div key={asset.id} className={`asset-card ${isSelected ? 'selected' : ''} ${asset.priority === 'high' ? 'priority' : ''} ${asset.orientation === 'portrait' ? 'portrait' : ''} ${asset.starred ? 'starred' : ''}`} onClick={(e) => handleAssetClick(asset, e)} onDoubleClick={() => setDetail(asset)}>
+                <div key={asset.id} className={`asset-card ${isSelected && selectMode ? 'selected' : ''} ${asset.priority === 'high' ? 'priority' : ''} ${asset.orientation === 'portrait' ? 'portrait' : ''} ${asset.starred ? 'starred' : ''}`} onClick={(e) => handleAssetClick(asset, e)} onDoubleClick={() => setDetail(asset)}>
                   <div className="asset-thumb-wrap" style={{ aspectRatio: asset.orientation === 'portrait' ? '9/16' : asset.orientation === 'square' ? '1/1' : '16/9' }}>
                     {thumb ? <img src={thumb} alt={asset.fileName} className="asset-thumb" loading="lazy" /> : <div className="asset-thumb-placeholder">{asset.mediaType === 'video' ? '🎬' : '🖼'}</div>}
                     {asset.mediaType === 'video' && (<div className="video-overlay"><span className="play-icon">▶</span>{asset.durationSeconds && <span className="duration-badge">{formatDuration(asset.durationSeconds)}</span>}</div>)}
                     {asset.finalStatus === 'final' && <div className="final-badge">FINAL</div>}
                     {asset.priority === 'high' && <div className="priority-dot" style={{ background: asset.colorLabel ? COLOR_CHIPS[asset.colorLabel]?.bg : '#ef4444' }} />}
-                    {isSelected && <div className="selected-checkmark">✓</div>}
+                    {isSelected && selectMode && <div className="selected-checkmark">✓</div>}
                     {/* Action overlay buttons */}
                     <button
                       className={`star-btn ${asset.starred ? 'starred' : ''}`}

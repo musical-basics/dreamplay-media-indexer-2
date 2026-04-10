@@ -192,6 +192,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   transition: all 0.15s;
 }
 .btn-ghost:hover { border-color: var(--border2); color: var(--text2); background: var(--bg3); }
+.select-mode-btn.active { background: rgba(74,158,255,0.12); border-color: var(--accent); color: var(--accent); }
 
 /* ── Zoom Slider ── */
 .zoom-slider-wrap {
