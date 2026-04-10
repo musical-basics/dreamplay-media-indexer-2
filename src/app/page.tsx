@@ -2337,7 +2337,7 @@ export default function MediaIndexer() {
         <div className="drawer-backdrop" onClick={() => setDetail(null)}>
 
           {/* ── Left: large image view (fills remaining space) ── */}
-          <div className="drawer-image-panel" onClick={e => e.stopPropagation()}>
+          <div className="drawer-image-panel" onClick={() => setDetail(null)}>
             {(detail.fileUrl || detail.thumbPath)
               ? <img
                   src={detail.fileUrl ?? thumbUrl(detail)!}
