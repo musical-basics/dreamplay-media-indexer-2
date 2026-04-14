@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const mediaType = contentType?.startsWith('video') ? 'video' : 'image';
+    const mediaType = (contentType?.startsWith('video') || contentType === 'application/mxf') ? 'video' : 'image';
 
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from('assets').upsert({

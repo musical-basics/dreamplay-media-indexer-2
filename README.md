@@ -106,9 +106,14 @@ src/
 │   └── api/
 │       ├── assets/       ← Query endpoint
 │       ├── export/       ← DaVinci XML + FCPXML export
+│       ├── reveal/       ← Reveal-in-Finder with local cache (LOCAL_WORKSPACE_DIR)
+│       ├── upload/
+│       │   ├── presign/  ← R2 presigned URL for browser uploads
+│       │   └── confirm/  ← Register uploaded asset in Supabase
 │       └── thumb/        ← Thumbnail server
 ├── lib/
 │   ├── taxonomy.ts       ← DreamPlay tag schema
+│   ├── db-admin.ts       ← Supabase admin client (server routes)
 │   ├── db.ts             ← SQLite catalog
 │   ├── tagger.ts         ← Gemini Vision AI tagger
 │   ├── media-utils.ts    ← ffprobe, thumbnail gen, color labels
@@ -116,5 +121,6 @@ src/
 │       ├── davinci-xml.ts
 │       └── fcpxml.ts
 └── scripts/
-    └── ingest.ts         ← Ingestion agent
+    ├── ingest.ts         ← Local ingestion agent
+    └── process-pending.ts ← Background processor for browser uploads
 ```

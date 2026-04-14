@@ -33,7 +33,7 @@ const ALLOWED_TYPES = new Set([
 
 export async function POST(req: NextRequest) {
   try {
-    const { fileName, contentType } = await req.json();
+    const { fileName, contentType, fileSize } = await req.json();
 
     if (!fileName || !contentType) {
       return NextResponse.json({ error: 'Missing fileName or contentType' }, { status: 400 });
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const assetId = uuidv4();
-    const isVideo = contentType.startsWith('video');
+    const isVideo = contentType.startsWith('video') || contentType === 'application/mxf';
     const prefix = isVideo ? 'videos' : 'images';
     const safeFileName = String(fileName).split(/[/\\]/).pop() ?? String(fileName);
     const r2Key = `${prefix}/${assetId}_${safeFileName}`;
