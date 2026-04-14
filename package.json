@@ -9,11 +9,15 @@
     "lint": "eslint",
     "ingest": "tsx src/scripts/ingest.ts",
     "watch": "tsx src/scripts/ingest.ts --watch",
+    "process-pending": "tsx src/scripts/process-pending.ts",
+    "process-watch": "tsx src/scripts/process-pending.ts --watch",
     "migrate-to-supabase": "tsx src/scripts/migrate-to-supabase.ts",
     "upload-thumbs": "tsx src/scripts/upload-thumbs-to-supabase.ts",
     "upload-images-r2": "tsx src/scripts/upload-images-to-r2.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1030.0",
+    "@aws-sdk/s3-request-presigner": "^3.1030.0",
     "@google/genai": "^1.48.0",
     "@supabase/supabase-js": "^2.102.1",
     "chokidar": "^5.0.0",
@@ -24,7 +28,6 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1027.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^20",

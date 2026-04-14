@@ -60,8 +60,9 @@ function formatBytes(b: number): string {
   if (b > 1e6) return `${(b / 1e6).toFixed(1)} MB`;
   return `${(b / 1e3).toFixed(0)} KB`;
 }
-function thumbUrl(asset: Asset | { thumbPath: string | null }): string {
+function thumbUrl(asset: Asset | { thumbPath: string | null; fileUrl?: string | null }): string {
   if (asset.thumbPath) return `/api/thumb?path=${encodeURIComponent(asset.thumbPath)}`;
+  if ('fileUrl' in asset && asset.fileUrl) return asset.fileUrl;
   return '';
 }
 
@@ -1834,6 +1835,8 @@ export default function MediaIndexer() {
   const [showStoryBuilder, setShowStoryBuilder] = useState(false);
   const [showReelGenerator, setShowReelGenerator] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(180);
+  const [revealLoading, setRevealLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<Record<string, { progress: number; status: string }>>({});
   const [scanStatus, setScanStatus] = useState<{ status: 'idle' | 'scanning'; lastScan: number | null }>({ status: 'idle', lastScan: null });
   const [scanning, setScanning] = useState(false);
   const [sidebarW, setSidebarW] = useState(210);
@@ -1913,6 +1916,65 @@ export default function MediaIndexer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, activeTab]);
 
+  async function handleUpload(files: FileList) {
+    for (const file of Array.from(files)) {
+      try {
+        setUploadStatus(prev => ({ ...prev, [file.name]: { progress: 0, status: 'uploading' } }));
+
+        const presignRes = await fetch('/api/upload/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+          }),
+        });
+        const presignData = await presignRes.json();
+        if (!presignRes.ok) throw new Error(presignData.error ?? 'Failed to prepare upload');
+
+        const { presignedUrl, publicUrl, assetId } = presignData;
+
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              setUploadStatus(prev => ({ ...prev, [file.name]: { progress: pct, status: 'uploading' } }));
+            }
+          };
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300)
+            ? resolve()
+            : reject(new Error(`R2 upload failed: ${xhr.status}`));
+          xhr.onerror = () => reject(new Error('Upload network error'));
+          xhr.open('PUT', presignedUrl);
+          xhr.setRequestHeader('Content-Type', file.type);
+          xhr.send(file);
+        });
+
+        const confirmRes = await fetch('/api/upload/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assetId,
+            fileName: file.name,
+            fileUrl: publicUrl,
+            contentType: file.type,
+            fileSize: file.size,
+          }),
+        });
+        const confirmData = await confirmRes.json();
+        if (!confirmRes.ok) throw new Error(confirmData.error ?? 'Failed to confirm upload');
+
+        setUploadStatus(prev => ({ ...prev, [file.name]: { progress: 100, status: 'pending-tags' } }));
+        fetchAssets();
+      } catch (err) {
+        setUploadStatus(prev => ({ ...prev, [file.name]: { progress: 0, status: 'error' } }));
+        console.error('Upload failed:', err);
+      }
+    }
+  }
+
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
   // Keyboard shortcuts: Space → preview last selected, Escape → close, Cmd+0 → reset
@@ -1945,6 +2007,8 @@ export default function MediaIndexer() {
   function setFilter(key: string, value: string) {
     setFilters(prev => ({ ...prev, [key]: prev[key as keyof typeof prev] === value ? '' : value }));
   }
+
+  const recentUploads = Object.entries(uploadStatus).slice(-3);
 
   function handleAssetClick(asset: Asset, e: React.MouseEvent) {
     lastClickedRef.current = asset.id;
@@ -2231,6 +2295,25 @@ export default function MediaIndexer() {
               </div>
             </div>
             <div className="grid-actions">
+              <label className="preview-reveal-btn" style={{ cursor: 'pointer' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+                Upload
+                <input
+                  type="file"
+                  multiple
+                  accept="video/*,image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files?.length) void handleUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {recentUploads.map(([name, status]) => (
+                <span key={name} className="selected-badge" title={name}>
+                  {name.length > 18 ? `${name.slice(0, 18)}…` : name} · {status.status === 'uploading' ? `${status.progress}%` : status.status === 'pending-tags' ? 'Processing…' : 'Error'}
+                </span>
+              ))}
               <button className="story-builder-btn" onClick={() => setShowStoryBuilder(true)}>🎬 Build Story</button>
               <button className="reel-gen-btn" onClick={() => setShowReelGenerator(true)}>🎙 Reel Generator</button>
               <button
@@ -2297,6 +2380,9 @@ export default function MediaIndexer() {
                     <div className="asset-name" title={asset.fileName}>{asset.fileName}</div>
                     <div className="asset-desc">{asset.aiDescription || '—'}</div>
                     <div className="asset-tags">
+                      {!asset.aiDescription && (
+                        <span className="tag" style={{ background: '#f59e0b', color: '#000' }}>Processing…</span>
+                      )}
                       {asset.subject !== 'unknown' && <span className="tag">{asset.subject}</span>}
                       {asset.handZone && <span className="tag zone">{asset.handZone}</span>}
                       {asset.dsModel && <span className="tag ds">{asset.dsModel}</span>}
@@ -2401,11 +2487,30 @@ export default function MediaIndexer() {
               </div>
 
               <div className="preview-actions" style={{ marginTop: 12 }}>
-                <button className="preview-reveal-btn" onClick={async () => {
-                  await fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: detail.filePath }) });
-                }}>
+                <button
+                  className="preview-reveal-btn"
+                  disabled={revealLoading}
+                  onClick={async () => {
+                    setRevealLoading(true);
+                    try {
+                      const res = await fetch('/api/reveal', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ assetId: detail.id }),
+                      });
+                      if (!res.ok) {
+                        const data = await res.json();
+                        alert(`Reveal failed: ${data.error}`);
+                      }
+                    } catch {
+                      alert('Reveal failed — network error');
+                    } finally {
+                      setRevealLoading(false);
+                    }
+                  }}
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                  Reveal in Finder
+                  {revealLoading ? 'Downloading…' : 'Reveal in Finder'}
                 </button>
                 {detail.fileUrl && (
                   <button className="preview-reveal-btn" onClick={() => downloadAsset({ stopPropagation: () => {} } as React.MouseEvent, detail)}>
