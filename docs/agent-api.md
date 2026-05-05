@@ -135,6 +135,127 @@ img_data = requests.get(image_url).content  # public URL, no auth needed
 
 ---
 
+## Uploading New Assets
+
+Agents can add new images and videos to the index in a two-step flow.
+
+### Step 1 — Get a presigned upload URL
+
+```
+POST /api/v1/assets/upload-url
+X-API-Key: <key>
+Content-Type: application/json
+
+{ "fileName": "my_clip.mp4", "contentType": "video/mp4" }
+```
+
+Response:
+```json
+{
+  "presignedUrl": "https://...r2.cloudflarestorage.com/...?X-Amz-Signature=...",
+  "publicUrl": "https://pub-....r2.dev/videos/<uuid>_my_clip.mp4",
+  "assetId": "uuid-v4",
+  "r2Key": "videos/<uuid>_my_clip.mp4",
+  "expiresIn": 3600
+}
+```
+
+Allowed `contentType` values:
+- Images: `image/jpeg`, `image/png`, `image/webp`, `image/heic`, `image/tiff`
+- Videos: `video/mp4`, `video/quicktime`, `video/x-m4v`, `video/x-msvideo`, `video/x-matroska`, `application/mxf`
+
+### Step 2 — PUT the file to the presigned URL
+
+No auth header — the signature is in the URL. The `Content-Type` of the PUT must match what you declared in step 1.
+
+```python
+import requests
+with open("my_clip.mp4", "rb") as f:
+    requests.put(presigned_url, data=f, headers={"Content-Type": "video/mp4"})
+```
+
+### Step 3 — Register the asset in the index
+
+```
+POST /api/v1/assets
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "assetId": "<uuid from step 1>",
+  "fileName": "my_clip.mp4",
+  "fileUrl": "<publicUrl from step 1>",
+  "contentType": "video/mp4",
+  "fileSize": 4200000,
+
+  "subject": "hands",
+  "purpose": "marketing",
+  "campaign": "DS 6.0",
+  "dsModel": "DS6.0",
+  "shotType": "close-up",
+  "orientation": "landscape",
+  "finalStatus": "final",
+  "priority": "high",
+  "aiDescription": "Overhead close-up of hands playing the DS 6.0 keyboard.",
+  "aiKeywords": ["piano", "hands", "close-up", "DS6.0"],
+  "width": 3840,
+  "height": 2160,
+  "durationSeconds": 12.5
+}
+```
+
+Required fields: `assetId`, `fileName`, `fileUrl`, `contentType`. Everything else is optional and defaults to safe values (`subject: "unknown"`, `finalStatus: "raw"`, `priority: "normal"`, `campaign: "Other"`, etc.) — fill in what you know.
+
+`aiKeywords` accepts a JSON-string-encoded array (`"[\"a\",\"b\"]"`) **or** a plain array (`["a", "b"]`).
+
+Response:
+```json
+{ "ok": true, "assetId": "...", "asset": { /* full row */ } }
+```
+
+You can also call `POST /api/v1/assets` for a file that already lives at a public URL — just skip steps 1 and 2 and pass the existing URL as `fileUrl`.
+
+### End-to-end example
+
+```python
+import requests, mimetypes
+
+BASE = "https://dreamplay-media-indexer.vercel.app"
+KEY  = "<AGENT_API_KEY>"
+PATH = "my_clip.mp4"
+
+content_type = mimetypes.guess_type(PATH)[0] or "application/octet-stream"
+
+# 1. Get presigned URL
+r = requests.post(
+    f"{BASE}/api/v1/assets/upload-url",
+    headers={"X-API-Key": KEY},
+    json={"fileName": PATH, "contentType": content_type},
+).json()
+
+# 2. Upload bytes
+with open(PATH, "rb") as f:
+    requests.put(r["presignedUrl"], data=f, headers={"Content-Type": content_type})
+
+# 3. Register
+requests.post(
+    f"{BASE}/api/v1/assets",
+    headers={"X-API-Key": KEY},
+    json={
+        "assetId": r["assetId"],
+        "fileName": PATH,
+        "fileUrl": r["publicUrl"],
+        "contentType": content_type,
+        "subject": "hands",
+        "purpose": "marketing",
+        "aiDescription": "Hands playing the DS 6.0.",
+        "aiKeywords": ["piano", "hands"],
+    },
+).raise_for_status()
+```
+
+---
+
 ## Asset Counts (as of April 2026)
 
 | Type | Count |
